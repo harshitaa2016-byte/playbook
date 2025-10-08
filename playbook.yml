@@ -1,0 +1,81 @@
+---
+- name: Execute PowerShell scripts on Windows VM
+  hosts: windows
+  gather_facts: false
+
+  tasks:
+    - name: Create Temp folder
+      win_file:
+        path: C:\Temp
+        state: directory
+
+    - name: Copy PowerShell scripts
+      win_copy:
+        src: "files/{{ item }}"
+        dest: "C:\\Temp\\{{ item }}"
+      loop:
+        - vcenters_cleanup.ps1
+        - ESXi-SSH-Manager.ps1
+        - Datastore-name-fixer.ps1
+        - Idrac_check.ps1
+
+    - name: Run vcenters_cleanup.ps1
+      block:
+        - name: Run vcenters_cleanup
+          win_shell: powershell.exe -ExecutionPolicy Bypass -File C:\\Temp\\vcenters_cleanup.ps1
+          register: result_vcenter
+          failed_when: result_vcenter.rc != 0
+      rescue:
+        - debug:
+            msg: "vcenters_cleanup.ps1 failed: {{ result_vcenter.stderr }}"
+
+    - name: Run ESXi-SSH-Manager.ps1
+      block:
+        - name: Run SSH manager
+          win_shell: powershell.exe -ExecutionPolicy Bypass -File C:\\Temp\\ESXi-SSH-Manager.ps1
+          register: result_ssh
+          failed_when: result_ssh.rc != 0
+      rescue:
+        - debug:
+            msg: "ESXi-SSH-Manager.ps1 failed: {{ result_ssh.stderr }}"
+
+    - name: Run Datastore-name-fixer.ps1
+      block:
+        - name: Run datastore fixer
+          win_shell: powershell.exe -ExecutionPolicy Bypass -File C:\\Temp\\Datastore-name-fixer.ps1
+          register: result_ds
+          failed_when: result_ds.rc != 0
+      rescue:
+        - debug:
+            msg: "Datastore-name-fixer.ps1 failed: {{ result_ds.stderr }}"
+
+    - name: Run Idrac_check.ps1
+      block:
+        - name: Run Idrac check
+          win_shell: powershell.exe -ExecutionPolicy Bypass -File C:\\Temp\\Idrac_check.ps1
+          register: result_idrac
+          failed_when: result_idrac.rc != 0
+      rescue:
+        - debug:
+            msg: "Idrac_check.ps1 failed: {{ result_idrac.stderr }}"
+
+- name: Execute Python script on Linux
+  hosts: linux
+  gather_facts: false
+
+  tasks:
+    - name: Copy Python script
+      copy:
+        src: files/Live_status_sheet_update.py
+        dest: /tmp/Live_status_sheet_update.py
+        mode: '0755'
+
+    - name: Run Live_status_sheet_update.py
+      block:
+        - name: Run status update
+          command: python3 /tmp/Live_status_sheet_update.py
+          register: result_live_status
+          failed_when: result_live_status.rc != 0
+      rescue:
+        - debug:
+            msg: "Live_status_sheet_update.py failed: {{ result_live_status.stderr }}"
